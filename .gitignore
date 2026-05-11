@@ -44,6 +44,7 @@ logs/
 *.mobi
 
 # Data files (too large for git)
+Quick-Start.txt
 *.csv
 *.json
 data/
