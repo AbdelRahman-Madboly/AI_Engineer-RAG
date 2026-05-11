@@ -1,18 +1,19 @@
-# AI Engineer — Retrieval Augmented Generation (RAG)
+# AI Engineer — RAG
 
-> A structured learning repository documenting the journey through RAG — from foundational concepts to production systems.  
-> Based on the **Retrieval Augmented Generation** course by [DeepLearning.AI](https://www.deeplearning.ai/) — taught by Zain Hasan.
+> A structured, self-documented learning repository for mastering **Retrieval Augmented Generation (RAG)** — from foundational concepts to production systems.
+
+Built while completing the [RAG Specialization by DeepLearning.AI](https://www.coursera.org/learn/retrieval-augmented-generation) — but written to be useful to **anyone** who wants to learn RAG deeply, not just follow a course.
 
 ---
 
 ## What This Repo Is
 
-This is not just a course folder. It is a **living knowledge base** designed to:
+This is not a course dump. It is a **knowledge base + project portfolio** built progressively as the author learns. Every file is written to be:
 
-- Document RAG concepts in a clear, reusable format that anyone can learn from
-- Track hands-on code projects and lab implementations
-- Store and organize research papers, articles, and books for deep mastery
-- Serve as a portfolio showing progression from basics to advanced RAG systems
+- **Readable** — clear explanations with analogies and real examples
+- **Practical** — connected to code, tools, and real use cases
+- **Reusable** — useful as a reference long after the course ends
+- **Portfolio-ready** — structured to show depth of understanding
 
 ---
 
@@ -21,91 +22,67 @@ This is not just a course folder. It is a **living knowledge base** designed to:
 ```
 AI_Engineer-RAG/
 │
-├── knowledge_base/          ← Topic-based learning material (MD files)
-│   ├── rag/                 ← What RAG is, why it matters, how it works
-│   ├── llms/                ← How Large Language Models work
-│   ├── retrieval/           ← Information retrieval, search, vector DBs
-│   └── architecture/        ← RAG system design and components
+├── knowledge_base/          ← Topic-based learning files (the brain of this repo)
+│   ├── rag_fundamentals/    ← What RAG is, why it exists, core concepts
+│   ├── llms/                ← How large language models work
+│   ├── retrieval/           ← Information retrieval, search, indexing
+│   └── rag_architecture/    ← System design, components, data flow
 │
-├── projects/                ← Code, labs, assignments per module
-│   └── module_01_RAG_Overview/
-│       ├── labs/            ← Ungraded lab notebooks
-│       └── assignments/     ← Graded assignment code
+├── projects/                ← Code, labs, experiments, assignments
+│   └── module_01/           ← Module 1 hands-on work
 │
-├── resources/               ← External material for deeper understanding
-│   ├── papers/              ← Scientific papers
-│   ├── articles/            ← Blog posts and technical articles
-│   └── books/               ← Books and long-form references
-│
-├── notes/                   ← Personal reflections and learning notes
-│
-├── environment.yml          ← Conda environment (reproducible setup)
-└── .gitignore
+└── resources/               ← Papers, articles, books, external material
+    └── papers/
 ```
 
 ---
 
-## Modules Covered
+## Knowledge Base Index
+
+| Topic Area | Files | Status |
+|---|---|---|
+| [RAG Fundamentals](./knowledge_base/rag_fundamentals/) | What is RAG, Applications | ✅ Module 1 |
+| [LLMs](./knowledge_base/llms/) | How LLMs work, tokens, hallucinations | ✅ Module 1 |
+| [Retrieval](./knowledge_base/retrieval/) | Information retrieval, indexing, scoring | ✅ Module 1 |
+| [RAG Architecture](./knowledge_base/rag_architecture/) | System design, components, data flow | ✅ Module 1 |
+
+---
+
+## Progress
 
 | Module | Title | Status |
-|--------|-------|--------|
-| 01 | RAG Overview | ✅ In Progress |
-| 02 | Information Retrieval and Search Foundations | 🔜 Upcoming |
-| 03 | Information Retrieval with Vector Databases | 🔜 Upcoming |
-| 04 | LLMs and Text Generation | 🔜 Upcoming |
-| 05 | RAG Systems in Production | 🔜 Upcoming |
+|---|---|---|
+| Module 1 | RAG Overview | ✅ Complete |
+| Module 2 | Information Retrieval & Search | 🔜 Upcoming |
+| Module 3 | Vector Databases | 🔜 Upcoming |
+| Module 4 | LLMs & Text Generation | 🔜 Upcoming |
+| Module 5 | RAG in Production | 🔜 Upcoming |
 
 ---
 
-## Knowledge Base Topics
+## Setup
 
-The `knowledge_base/` folder is organized by **topic**, not by module. This makes it easy to look up a concept without knowing which module it came from.
+### Prerequisites
+- [Anaconda](https://www.anaconda.com/) installed
+- VS Code with Python and Jupyter extensions
 
-| Topic Area | Description |
-|------------|-------------|
-| `rag/` | Core RAG concepts, motivation, and workflow |
-| `llms/` | LLM internals — tokens, training, hallucinations, context windows |
-| `retrieval/` | Search methods, indexing, ranking, vector databases |
-| `architecture/` | RAG system design, components, and trade-offs |
-
----
-
-## How to Set Up the Environment
-
-This repo uses **Conda** for environment management.
+### Create the environment
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/AbdelRahman-Madboly/AI_Engineer-RAG.git
-cd AI_Engineer-RAG
-
-# 2. Create the environment
 conda env create -f environment.yml
-
-# 3. Activate it
 conda activate rag-course
-
-# 4. Launch Jupyter
-jupyter notebook
 ```
 
----
+### Open in VS Code
 
-## Tech Stack
-
-- **Python 3.11**
-- **Together AI** — LLM hosting (open-source models)
-- **Weaviate** — Vector database (used in Module 3+)
-- **Jupyter Notebook** — Lab environment
-- **OpenAI SDK** (Together-compatible)
+```bash
+cd AI_Engineer-RAG
+code .
+```
 
 ---
 
 ## Author
 
 **AbdelRahman Madboly**  
-AI Engineer in progress — documenting the path.
-
----
-
-*"RAG may be the most commonly built type of LLM-based application in the world today."* — Andrew Ng
+Learning AI Engineering — documenting every step.
