@@ -26,22 +26,23 @@ import os
 from typing import List, Dict
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
-# ── Backend selection ─────────────────────────────────────────────────────────
 
-BACKEND = os.environ.get("LLM_BACKEND", "ollama").lower()
-
-# Default models per backend
-DEFAULT_MODELS = {
-    "ollama":   os.environ.get("OLLAMA_MODEL",   "qwen2.5:7b"),
-    "gemini":   os.environ.get("GEMINI_MODEL",   "gemini-2.0-flash"),
-    "together": os.environ.get("TOGETHER_MODEL", "Qwen/Qwen2.5-7B-Instruct-Turbo"),
-}
+def _backend() -> str:
+    """Read LLM_BACKEND fresh so .env changes take effect without restarting."""
+    return os.environ.get("LLM_BACKEND", "ollama").lower()
 
 
 def _default_model() -> str:
-    return DEFAULT_MODELS.get(BACKEND, "qwen2.5:7b")
+    """Read model name fresh every call."""
+    b = _backend()
+    defaults = {
+        "ollama":   os.environ.get("OLLAMA_MODEL",   "qwen3.5:4B"),
+        "gemini":   os.environ.get("GEMINI_MODEL",   "gemini-2.0-flash"),
+        "together": os.environ.get("TOGETHER_MODEL", "Qwen/Qwen2.5-7B-Instruct-Turbo"),
+    }
+    return defaults.get(b, "qwen3.5:4B")
 
 
 # ── Backend implementations ───────────────────────────────────────────────────
@@ -56,6 +57,7 @@ def _call_ollama(messages: list, model: str, max_tokens: int,
         "model": model,
         "messages": messages,
         "stream": False,
+        "think": False,          # disable Qwen3 thinking tokens
         "options": {"num_predict": max_tokens},
     }
     if temperature is not None:
@@ -67,9 +69,18 @@ def _call_ollama(messages: list, model: str, max_tokens: int,
     resp.raise_for_status()
     data = resp.json()
 
+    content = data["message"].get("content", "")
+
+    # Qwen3 thinking models: if content is empty, answer may be in 'thinking' field
+    # or wrapped in <think>...</think> tags — strip them out
+    if not content.strip():
+        import re
+        thinking_raw = data["message"].get("thinking", "") or content
+        content = re.sub(r"<think>.*?</think>", "", thinking_raw, flags=re.DOTALL).strip()
+
     return {
         "role":    data["message"]["role"],
-        "content": data["message"]["content"],
+        "content": content,
     }
 
 
@@ -169,15 +180,16 @@ def _call_together(messages: list, model: str, max_tokens: int,
 def _dispatch(messages: list, model: str, max_tokens: int,
               temperature: float, top_p: float, **kwargs) -> dict:
     """Route the call to the correct backend."""
-    if BACKEND == "ollama":
+    backend = _backend()
+    if backend == "ollama":
         return _call_ollama(messages, model, max_tokens, temperature, top_p, **kwargs)
-    elif BACKEND == "gemini":
+    elif backend == "gemini":
         return _call_gemini(messages, model, max_tokens, temperature, top_p, **kwargs)
-    elif BACKEND == "together":
+    elif backend == "together":
         return _call_together(messages, model, max_tokens, temperature, top_p, **kwargs)
     else:
         raise ValueError(
-            f"Unknown LLM_BACKEND='{BACKEND}'. "
+            f"Unknown LLM_BACKEND='{backend}'. "
             "Choose one of: ollama, gemini, together"
         )
 
