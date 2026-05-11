@@ -87,7 +87,7 @@ def _call_ollama(messages: list, model: str, max_tokens: int,
 def _call_gemini(messages: list, model: str, max_tokens: int,
                  temperature: float, top_p: float, **kwargs) -> dict:
     """Call Google Gemini via the generativeai SDK."""
-    import google.generativeai as genai
+    import google.generativeai as genai # type: ignore
 
     api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
