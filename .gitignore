@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Conda / Virtual environments
+envs/
+.env
+.venv
+env/
+
+# API keys — NEVER commit these
+.env
+*.env
+secrets.py
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Logs
+*.log
+logs/
+
+# Large binary files (add papers/books individually)
+*.pdf
+*.epub
+*.mobi
+
+# Data files (too large for git)
+*.csv
+*.json
+data/
+content/

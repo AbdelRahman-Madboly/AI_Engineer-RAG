@@ -1,0 +1,25 @@
+name: rag-env
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - jupyter
+  - notebook
+  - ipywidgets
+  - ipykernel
+  - matplotlib
+  - numpy
+  - scikit-learn
+  - pip:
+      - together
+      - requests
+      - python-dotenv
+      - sentence-transformers
+      - adjustText
+      - tiktoken
+      - weaviate-client
+      - tqdm
+      - pandas
+      - openai
