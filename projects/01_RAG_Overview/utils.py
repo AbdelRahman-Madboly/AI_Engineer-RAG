@@ -1,85 +1,188 @@
 """
 utils.py — LLM helper functions for the RAG course
 ====================================================
-Wraps Together.ai API calls into two clean functions used across all notebooks:
+Supports three backends:
+    - together  → Together.ai API (original)
+    - ollama    → Local Ollama server (http://localhost:11434)
+    - gemini    → Google Gemini API
 
-    generate_with_single_input()   — one prompt → one response
-    generate_with_multiple_input() — full conversation history → one response
+Set LLM_BACKEND in your .env file (defaults to "ollama"):
 
-Local setup:
-    - Requires TOGETHER_API_KEY in your .env file at the repo root
-    - Load it before importing: from dotenv import load_dotenv; load_dotenv()
+    # .env
+    LLM_BACKEND=ollama          # use local Ollama
+    LLM_BACKEND=gemini          # use Google Gemini
+    LLM_BACKEND=together        # use Together.ai (needs TOGETHER_API_KEY)
+
+    GEMINI_API_KEY=your_key     # required only for gemini backend
+    TOGETHER_API_KEY=your_key   # required only for together backend
+
+    # Optional: override default models per backend
+    OLLAMA_MODEL=qwen2.5:7b
+    GEMINI_MODEL=gemini-2.0-flash
+    TOGETHER_MODEL=Qwen/Qwen2.5-7B-Instruct-Turbo
 """
 
 import os
-import json
-import requests
 from typing import List, Dict
 from dotenv import load_dotenv
 
-# ── Auto-load .env when this file is imported ─────────────────────────────────
-# Looks for .env in the current folder and all parent folders
 load_dotenv()
 
+# ── Backend selection ─────────────────────────────────────────────────────────
 
-# ── Internal helpers ──────────────────────────────────────────────────────────
+BACKEND = os.environ.get("LLM_BACKEND", "ollama").lower()
 
-def _get_api_key() -> str:
-    """
-    Reads TOGETHER_API_KEY from environment.
-    Raises a clear error if the key is missing so you know exactly what to fix.
-    """
-    key = os.environ.get("TOGETHER_API_KEY", "")
-    if not key:
+# Default models per backend
+DEFAULT_MODELS = {
+    "ollama":   os.environ.get("OLLAMA_MODEL",   "qwen2.5:7b"),
+    "gemini":   os.environ.get("GEMINI_MODEL",   "gemini-2.0-flash"),
+    "together": os.environ.get("TOGETHER_MODEL", "Qwen/Qwen2.5-7B-Instruct-Turbo"),
+}
+
+
+def _default_model() -> str:
+    return DEFAULT_MODELS.get(BACKEND, "qwen2.5:7b")
+
+
+# ── Backend implementations ───────────────────────────────────────────────────
+
+def _call_ollama(messages: list, model: str, max_tokens: int,
+                 temperature: float, top_p: float, **kwargs) -> dict:
+    """Call local Ollama server via its OpenAI-compatible endpoint."""
+    import requests
+
+    url = os.environ.get("OLLAMA_HOST", "http://localhost:11434") + "/api/chat"
+    payload = {
+        "model": model,
+        "messages": messages,
+        "stream": False,
+        "options": {"num_predict": max_tokens},
+    }
+    if temperature is not None:
+        payload["options"]["temperature"] = temperature
+    if top_p is not None:
+        payload["options"]["top_p"] = top_p
+
+    resp = requests.post(url, json=payload, timeout=120)
+    resp.raise_for_status()
+    data = resp.json()
+
+    return {
+        "role":    data["message"]["role"],
+        "content": data["message"]["content"],
+    }
+
+
+def _call_gemini(messages: list, model: str, max_tokens: int,
+                 temperature: float, top_p: float, **kwargs) -> dict:
+    """Call Google Gemini via the generativeai SDK."""
+    import google.generativeai as genai
+
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
         raise EnvironmentError(
-            "\n\n❌ TOGETHER_API_KEY not found.\n"
-            "Fix: create a .env file at the root of your repo with:\n"
-            "     TOGETHER_API_KEY=your_key_here\n"
-            "Then run: from dotenv import load_dotenv; load_dotenv()\n"
+            "\n\n❌ GEMINI_API_KEY not found.\n"
+            "Fix: add  GEMINI_API_KEY=your_key  to your .env file.\n"
+            "Get a free key at https://aistudio.google.com/apikey\n"
         )
-    return key
+    genai.configure(api_key=api_key)
+
+    # Convert messages to Gemini format
+    # Gemini uses 'user' / 'model' roles; system messages become the first user turn
+    system_text = ""
+    gemini_history = []
+    for msg in messages:
+        role = msg["role"]
+        content = msg["content"]
+        if role == "system":
+            system_text = content  # handled separately
+        elif role == "user":
+            gemini_history.append({"role": "user", "parts": [content]})
+        elif role == "assistant":
+            gemini_history.append({"role": "model", "parts": [content]})
+
+    gen_config = genai.types.GenerationConfig(max_output_tokens=max_tokens)
+    if temperature is not None:
+        gen_config.temperature = temperature
+    if top_p is not None:
+        gen_config.top_p = top_p
+
+    gemini_model = genai.GenerativeModel(
+        model_name=model,
+        system_instruction=system_text if system_text else None,
+        generation_config=gen_config,
+    )
+
+    # Last message must be user — start chat with history minus last turn
+    if gemini_history and gemini_history[-1]["role"] == "user":
+        last_user = gemini_history[-1]["parts"][0]
+        history = gemini_history[:-1]
+    else:
+        last_user = ""
+        history = gemini_history
+
+    chat = gemini_model.start_chat(history=history)
+    response = chat.send_message(last_user)
+
+    return {
+        "role":    "assistant",
+        "content": response.text,
+    }
 
 
-def _call_api(payload: dict) -> dict:
-    """
-    Sends the payload to Together.ai and returns the parsed JSON response.
-    Raises descriptive exceptions on HTTP errors or bad JSON.
-    """
+def _call_together(messages: list, model: str, max_tokens: int,
+                   temperature: float, top_p: float, **kwargs) -> dict:
+    """Call Together.ai (original backend)."""
     from together import Together
 
-    api_key = _get_api_key()
+    api_key = os.environ.get("TOGETHER_API_KEY", "")
+    if not api_key:
+        raise EnvironmentError(
+            "\n\n❌ TOGETHER_API_KEY not found.\n"
+            "Fix: add  TOGETHER_API_KEY=your_key  to your .env file.\n"
+        )
+
     client = Together(api_key=api_key)
+    payload = {
+        "model":      model,
+        "messages":   messages,
+        "max_tokens": max_tokens,
+        "reasoning":  {"enabled": False},
+        **kwargs,
+    }
+    if temperature is not None:
+        payload["temperature"] = temperature
+    if top_p is not None:
+        payload["top_p"] = top_p
 
-    # together SDK returns a Pydantic model — convert to dict
     response = client.chat.completions.create(**payload).model_dump()
-
-    # Normalize the role field (SDK returns an enum, we want a plain string)
-    response["choices"][-1]["message"]["role"] = (
-        response["choices"][-1]["message"]["role"].name.lower()
-        if hasattr(response["choices"][-1]["message"]["role"], "name")
-        else str(response["choices"][-1]["message"]["role"]).lower()
-    )
-    return response
+    role = response["choices"][-1]["message"]["role"]
+    role = role.name.lower() if hasattr(role, "name") else str(role).lower()
+    return {
+        "role":    role,
+        "content": response["choices"][-1]["message"]["content"],
+    }
 
 
-def _extract_output(response: dict) -> dict:
-    """
-    Pulls role and content out of the raw API response dict.
-    Returns: {'role': 'assistant', 'content': '...'}
-    """
-    try:
-        return {
-            "role":    response["choices"][-1]["message"]["role"],
-            "content": response["choices"][-1]["message"]["content"],
-        }
-    except (KeyError, IndexError) as e:
+# ── Dispatcher ────────────────────────────────────────────────────────────────
+
+def _dispatch(messages: list, model: str, max_tokens: int,
+              temperature: float, top_p: float, **kwargs) -> dict:
+    """Route the call to the correct backend."""
+    if BACKEND == "ollama":
+        return _call_ollama(messages, model, max_tokens, temperature, top_p, **kwargs)
+    elif BACKEND == "gemini":
+        return _call_gemini(messages, model, max_tokens, temperature, top_p, **kwargs)
+    elif BACKEND == "together":
+        return _call_together(messages, model, max_tokens, temperature, top_p, **kwargs)
+    else:
         raise ValueError(
-            f"Unexpected API response shape. Could not extract output.\n"
-            f"Error: {e}\nFull response: {response}"
+            f"Unknown LLM_BACKEND='{BACKEND}'. "
+            "Choose one of: ollama, gemini, together"
         )
 
 
-# ── Public API ─────────────────────────────────────────────────────────────────
+# ── Public API (same interface as original utils.py) ──────────────────────────
 
 def generate_with_single_input(
     prompt: str,
@@ -87,7 +190,7 @@ def generate_with_single_input(
     max_tokens: int = 500,
     temperature: float = None,
     top_p: float = None,
-    model: str = "Qwen/Qwen2.5-7B-Instruct-Turbo",
+    model: str = None,
     **kwargs,
 ) -> dict:
     """
@@ -95,43 +198,24 @@ def generate_with_single_input(
 
     Args:
         prompt      : The text to send to the model.
-        role        : Who is sending the message — 'user', 'system', or 'assistant'.
-                      Defaults to 'user' (the most common case).
+        role        : 'user', 'system', or 'assistant'. Defaults to 'user'.
         max_tokens  : Maximum tokens in the response. Default 500.
-        temperature : Controls randomness. 0.0 = deterministic, 1.0+ = creative.
-                      Leave as None to use the model's default.
-        top_p       : Nucleus sampling threshold. Leave as None for model default.
-        model       : Together.ai model name.
-        **kwargs    : Any extra parameters passed directly to the API.
+        temperature : 0.0 = deterministic, 1.0+ = creative. None = model default.
+        top_p       : Nucleus sampling. None = model default.
+        model       : Model name. Defaults to the backend's default model.
 
     Returns:
-        dict with two keys:
-            'role'    → always 'assistant'
-            'content' → the model's response text
+        {'role': 'assistant', 'content': '<response text>'}
 
     Example:
         output = generate_with_single_input("What is the capital of France?")
         print(output['content'])  # → Paris
     """
-    # Build the messages list from the single prompt
+    if model is None:
+        model = _default_model()
+
     messages = [{"role": role, "content": prompt}]
-
-    payload = {
-        "model":    model,
-        "messages": messages,
-        "max_tokens": max_tokens,
-        "reasoning": {"enabled": False},  # disable chain-of-thought reasoning tokens
-        **kwargs,
-    }
-
-    # Only add optional params if explicitly set — avoids API errors for None values
-    if temperature is not None:
-        payload["temperature"] = temperature
-    if top_p is not None:
-        payload["top_p"] = top_p
-
-    response = _call_api(payload)
-    return _extract_output(response)
+    return _dispatch(messages, model, max_tokens, temperature, top_p, **kwargs)
 
 
 def generate_with_multiple_input(
@@ -139,70 +223,44 @@ def generate_with_multiple_input(
     max_tokens: int = 500,
     temperature: float = None,
     top_p: float = None,
-    model: str = "Qwen/Qwen2.5-7B-Instruct-Turbo",
+    model: str = None,
     **kwargs,
 ) -> dict:
     """
     Send a full conversation history to an LLM and get the next response.
-    Use this for multi-turn chat or when you need a system message.
 
     Args:
-        messages    : List of message dicts, each with 'role' and 'content'.
+        messages    : List of {'role': ..., 'content': ...} dicts.
                       Roles: 'system', 'user', 'assistant'.
-                      The list represents the full conversation so far.
         max_tokens  : Maximum tokens in the response. Default 500.
-        temperature : Controls randomness. 0.0 = deterministic, 1.0+ = creative.
-        top_p       : Nucleus sampling. Leave as None for model default.
-        model       : Together.ai model name.
-        **kwargs    : Any extra parameters passed directly to the API.
+        temperature : Randomness control.
+        top_p       : Nucleus sampling.
+        model       : Model name. Defaults to the backend's default model.
 
     Returns:
-        dict with two keys:
-            'role'    → always 'assistant'
-            'content' → the model's response text
+        {'role': 'assistant', 'content': '<response text>'}
 
     Example:
         messages = [
-            {'role': 'system',    'content': 'You are a helpful assistant.'},
-            {'role': 'user',      'content': 'What is RAG?'},
-            {'role': 'assistant', 'content': 'RAG is Retrieval Augmented Generation.'},
-            {'role': 'user',      'content': 'What problem does it solve?'},
+            {'role': 'system', 'content': 'You are a helpful assistant.'},
+            {'role': 'user',   'content': 'What is RAG?'},
         ]
         output = generate_with_multiple_input(messages)
         print(output['content'])
     """
-    payload = {
-        "model":    model,
-        "messages": messages,
-        "max_tokens": max_tokens,
-        "reasoning": {"enabled": False},
-        **kwargs,
-    }
+    if model is None:
+        model = _default_model()
 
-    if temperature is not None:
-        payload["temperature"] = temperature
-    if top_p is not None:
-        payload["top_p"] = top_p
-
-    response = _call_api(payload)
-    return _extract_output(response)
+    return _dispatch(messages, model, max_tokens, temperature, top_p, **kwargs)
 
 
-# ── Compatibility helpers (match the course's original utils.py interface) ─────
+# ── Compatibility helpers ─────────────────────────────────────────────────────
 
 def get_together_key() -> str:
-    """Returns the Together.ai API key from environment. Used by some notebooks."""
-    return _get_api_key()
-
+    return os.environ.get("TOGETHER_API_KEY", "")
 
 def get_proxy_url() -> str:
-    """
-    Returns the API base URL.
-    In the Coursera environment this pointed to a proxy — locally it's Together.ai directly.
-    """
     return os.environ.get("TOGETHER_BASE_URL", "https://api.together.xyz/")
 
-
 def get_proxy_headers() -> dict:
-    """Returns auth headers. Kept for compatibility with OpenAI-client notebooks."""
     return {"Authorization": os.environ.get("TOGETHER_API_KEY", "")}
