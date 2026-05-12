@@ -1,0 +1,38 @@
+============================================================
+  AI_Engineer-RAG — Quick Start Guide
+============================================================
+
+EVERY TIME YOU OPEN A NEW ANACONDA PROMPT:
+--------------------------------------------
+
+Step 1 — Go to the project folder:
+    cd /d D:\AI_Engineer-RAG
+
+Step 2 — Activate the environment:
+    conda activate rag-env
+
+Step 3a — Launch Jupyter Notebook:
+    jupyter notebook
+
+Step 3b — OR launch VS Code in this folder:
+    code .
+
+
+AFTER WORKING — Save your progress to GitHub:
+----------------------------------------------
+
+    git add .
+    git commit -m "describe what you did"
+    git push
+
+
+TO UPDATE YOUR ENVIRONMENT (if environment.yml changes):
+---------------------------------------------------------
+
+    conda env update -f environment.yml --prune
+
+
+ENVIRONMENT NAME:  rag-env
+PYTHON VERSION:    3.11
+TOGETHER AI KEY:   stored in .env file (never commit this)
+============================================================

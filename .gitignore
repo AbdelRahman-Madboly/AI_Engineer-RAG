@@ -38,14 +38,38 @@ build/
 *.log
 logs/
 
-# Large binary files (add papers/books individually)
+# Large binary files
 *.pdf
 *.epub
 *.mobi
 
-# Data files (too large for git)
-Quick-Start.txt
+# ── HuggingFace model cache ───────────────────────────────────────────────────
+# sentence-transformers / transformers download models here
+# (~438 MB for bge-base-en-v1.5 alone)
+.cache/
+~/.cache/
+huggingface/
+sentence_transformers/
+models/
+
+# ── Datasets ──────────────────────────────────────────────────────────────────
+# sklearn fetch_20newsgroups downloads here (data_home="./dataset")
+projects/02_Information_Retrieval_and_Search_Foundations/labs/dataset/
+
+# ── Computed embedding caches ─────────────────────────────────────────────────
+# These are generated on first run - no need to track in git
+# lab03 saves doc_embeddings.joblib
+# lab05 saves embeddings.joblib
+projects/02_Information_Retrieval_and_Search_Foundations/labs/*.joblib
+
+# Keep the assignment embeddings (small, pre-computed, required to run)
+!projects/01_RAG_Overview/assignments/embeddings.joblib
+
+# ── Course original content ───────────────────────────────────────────────────
+# Raw Coursera downloads - not part of the repo
+content/
+
+# ── Misc data files ───────────────────────────────────────────────────────────
 *.csv
 *.json
 data/
-content/
